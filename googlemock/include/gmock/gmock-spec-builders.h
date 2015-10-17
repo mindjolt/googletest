@@ -134,6 +134,12 @@ class GTEST_API_ UntypedFunctionMockerBase {
   bool VerifyAndClearExpectationsLocked()
       GTEST_EXCLUSIVE_LOCK_REQUIRED_(g_gmock_mutex);
 
+  // Clears all expectations on this mock function.
+  // Useful when exception on failure is set, when verifying throws
+  // an exception the clear never happens.
+  void ClearExpectationsLocked()
+      GTEST_EXCLUSIVE_LOCK_REQUIRED_(g_gmock_mutex);
+
   // Clears the ON_CALL()s set on this mock function.
   virtual void ClearDefaultActionsLocked()
       GTEST_EXCLUSIVE_LOCK_REQUIRED_(g_gmock_mutex) = 0;
@@ -383,11 +389,20 @@ class GTEST_API_ Mock {
   static bool VerifyAndClearExpectations(void* mock_obj)
       GTEST_LOCK_EXCLUDED_(internal::g_gmock_mutex);
 
+  // Clears all expectations on the given mock object.
+  // Useful for when throw on failure is set, otherwise there is no
+  // other way to clear the expectations on shutdown
+  static void ClearExpectations(void* mock_obj)
+      GTEST_LOCK_EXCLUDED_(internal::g_gmock_mutex);
+
   // Verifies all expectations on the given mock object and clears its
   // default actions and expectations.  Returns true iff the
   // verification was successful.
   static bool VerifyAndClear(void* mock_obj)
       GTEST_LOCK_EXCLUDED_(internal::g_gmock_mutex);
+
+  // Clears the mock's default actions and expectations without verification.
+  static void Clear(void* mock_obj);
 
  private:
   friend class internal::UntypedFunctionMockerBase;
@@ -436,6 +451,12 @@ class GTEST_API_ Mock {
   // satisfied.  Reports one or more Google Test non-fatal failures
   // and returns false if not.
   static bool VerifyAndClearExpectationsLocked(void* mock_obj)
+      GTEST_EXCLUSIVE_LOCK_REQUIRED_(internal::g_gmock_mutex);
+
+  // Clears all expectations on the given mock object.
+  // Useful for when throw on failure is set, otherwise there is no
+  // other way to clear the expectations on shutdown.
+  static void ClearExpectationsLocked(void* mock_obj)
       GTEST_EXCLUSIVE_LOCK_REQUIRED_(internal::g_gmock_mutex);
 
   // Clears all ON_CALL()s set on the given mock object.

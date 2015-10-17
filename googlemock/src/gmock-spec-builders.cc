@@ -509,6 +509,15 @@ bool UntypedFunctionMockerBase::VerifyAndClearExpectationsLocked()
   return expectations_met;
 }
 
+// Clears all expectations on this mock function.
+// Useful when exception on failure is set, when verifying throws
+// an exception the clear never happens.
+void UntypedFunctionMockerBase::ClearExpectationsLocked()
+    GTEST_EXCLUSIVE_LOCK_REQUIRED_(g_gmock_mutex) {
+  g_gmock_mutex.AssertHeld();
+  untyped_expectations_.clear();
+}
+
 }  // namespace internal
 
 // Class Mock.
@@ -669,6 +678,15 @@ bool Mock::VerifyAndClearExpectations(void* mock_obj)
   return VerifyAndClearExpectationsLocked(mock_obj);
 }
 
+// Clears all expectations on the given mock object.
+// Useful for when throw on failure is set, otherwise there is no
+// other way to clear the expectations on shutdown.
+void Mock::ClearExpectations(void* mock_obj)
+    GTEST_LOCK_EXCLUDED_(internal::g_gmock_mutex) {
+  internal::MutexLock l(&internal::g_gmock_mutex);
+  return ClearExpectationsLocked(mock_obj);
+}
+
 // Verifies all expectations on the given mock object and clears its
 // default actions and expectations.  Returns true iff the
 // verification was successful.
@@ -677,6 +695,15 @@ bool Mock::VerifyAndClear(void* mock_obj)
   internal::MutexLock l(&internal::g_gmock_mutex);
   ClearDefaultActionsLocked(mock_obj);
   return VerifyAndClearExpectationsLocked(mock_obj);
+}
+
+// Clears the mock's default actions and expectations without
+// verification.
+void Mock::Clear(void* mock_obj)
+    GTEST_LOCK_EXCLUDED_(internal::g_gmock_mutex) {
+  internal::MutexLock l(&internal::g_gmock_mutex);
+  ClearDefaultActionsLocked(mock_obj);
+  ClearExpectationsLocked(mock_obj);
 }
 
 // Verifies and clears all expectations on the given mock object.  If
@@ -705,6 +732,21 @@ bool Mock::VerifyAndClearExpectationsLocked(void* mock_obj)
   // We don't clear the content of mockers, as they may still be
   // needed by ClearDefaultActionsLocked().
   return expectations_met;
+}
+
+// Clears all expectations on the given mock object.
+// Useful for when throw on failure is set, otherwise there is no
+// other way to clear the expectations on shutdown.
+void Mock::ClearExpectationsLocked(void* mock_obj)
+    GTEST_EXCLUSIVE_LOCK_REQUIRED_(internal::g_gmock_mutex) {
+  internal::g_gmock_mutex.AssertHeld();
+
+  FunctionMockers& mockers =
+      g_mock_object_registry.states()[mock_obj].function_mockers;
+  for (FunctionMockers::const_iterator it = mockers.begin();
+       it != mockers.end(); ++it) {
+    (*it)->ClearExpectationsLocked();
+  }
 }
 
 // Registers a mock object and a mock method it owns.
